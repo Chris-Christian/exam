@@ -55,6 +55,26 @@ START: MOV AX, DATA ; Load address of DATA segment into AX
 CODE ENDS
 END START
 
+//Q4. Write an assembly language program to add two 16-bit numbers.
+
+DATA SEGMENT
+NUM1 DW 1234H ; First 16-bit number
+NUM2 DW 5678H ; Second 16-bit number
+RESULT DW ? ; To store the result
+DATA ENDS
+
+CODE SEGMENT
+ASSUME CS:CODE, DS:DATA
+START: MOV AX, DATA ; Load address of DATA segment into AX
+MOV DS, AX
+MOV AX, NUM1
+MOV BX, NUM2
+ADD AX, BX 
+MOV RESULT, AX 
+INT 3H 
+CODE ENDS
+END START
+
 //PRINT
 
 DATA SEGMENT
